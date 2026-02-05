@@ -84,7 +84,7 @@ export async function generateChatResponse(request: ChatRequest): Promise<ChatRe
         throw new Error(`API Error ${response.status}: ${errText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, tidak ada respons.';
     
     console.log(`✅ RAW Response received from ${modelName}`);
@@ -148,7 +148,7 @@ export async function* generateStreamingResponse(request: ChatRequest): AsyncGen
         throw new Error(`API Error ${response.status}: ${errText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const fullText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     console.log(`✅ Response received (Length: ${fullText.length})`);
