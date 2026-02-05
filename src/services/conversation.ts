@@ -219,7 +219,7 @@ export const getRecentConversations = async (userId: string, limit: number = 20)
     conversations.map(async (conv) => {
       const lastMessage = await Message.findOne({ conversationId: conv._id })
         .sort({ createdAt: -1 })
-        .lean();
+        .lean() as any;
       
       return {
         ...conv,
