@@ -43,6 +43,7 @@ PRINSIP UTAMA:
 BAHASA: Gunakan Bahasa Indonesia untuk penjelasan, kode dalam bahasa pemrograman standar.`;
 
 export async function generateChatResponse(request: ChatRequest): Promise<ChatResponse> {
+  // Use requested model or default to 2.5-flash
   const modelName = request.model || 'gemini-2.5-flash';
   
   if (!API_KEY) {
@@ -58,22 +59,35 @@ export async function generateChatResponse(request: ChatRequest): Promise<ChatRe
       parts: [{ text: request.message }]
     });
 
-    console.log(`📤 Sending request to ${modelName}...`);
+    console.log(`📤 Sending RAW API request to ${modelName}...`);
 
-    const response = await genAI.models.generateContent({
-      model: modelName,
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-        topP: 0.9,
-        topK: 40,
-      }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: contents,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+          topP: 0.9,
+          topK: 40,
+        }
+      })
     });
 
-    const text = response.text || 'Maaf, saya tidak bisa memberikan respons saat ini.';
-    console.log(`✅ Response received from ${modelName}`);
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error('Gemini API Error Body:', errText);
+        throw new Error(`API Error ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, tidak ada respons.';
+    
+    console.log(`✅ RAW Response received from ${modelName}`);
 
     return { response: text, model: modelName };
   } catch (error: any) {
@@ -84,6 +98,7 @@ export async function generateChatResponse(request: ChatRequest): Promise<ChatRe
 
 // Streaming response generator
 export async function* generateStreamingResponse(request: ChatRequest): AsyncGenerator<string> {
+  // Use requested model or default to 2.5-flash
   const modelName = request.model || 'gemini-2.5-flash';
   
   if (!API_KEY) {
@@ -98,40 +113,55 @@ export async function* generateStreamingResponse(request: ChatRequest): AsyncGen
       msg && msg.parts && msg.parts.length > 0 && msg.parts[0].text && msg.parts[0].text.trim()
     );
     
-    // Build contents array with validated history + new message
     const contents: ChatMessage[] = [...validHistory];
-    
-    // Add the current user message
     const userMessage = request.message?.trim();
-    if (!userMessage) {
-      throw new Error('Message cannot be empty');
-    }
+    if (!userMessage) throw new Error('Message cannot be empty');
     
     contents.push({
       role: 'user',
       parts: [{ text: userMessage }]
     });
 
-    console.log(`📤 Streaming request to ${modelName} with ${contents.length} messages...`);
+    console.log(`📤 Streaming (Simulated) RAW API request to ${modelName}...`);
 
-    const response = await genAI.models.generateContentStream({
-      model: modelName,
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-        topP: 0.9,
-        topK: 40,
-      }
+    // Use standard generateContent (not stream) for reliability
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: contents,
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+          topP: 0.9,
+          topK: 40,
+        }
+      })
     });
 
-    for await (const chunk of response) {
-      const text = chunk.text;
-      if (text) {
-        yield text;
-      }
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error('Gemini API Error Body:', errText);
+        throw new Error(`API Error ${response.status}: ${errText}`);
     }
+
+    const data = await response.json();
+    const fullText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    console.log(`✅ Response received (Length: ${fullText.length})`);
+
+    // Yield in chunks to simulate streaming
+    const chunkSize = 10; // Characters per chunk
+    for (let i = 0; i < fullText.length; i += chunkSize) {
+        const chunk = fullText.slice(i, i + chunkSize);
+        yield chunk;
+        // Small delay to simulate typing if needed, but awaiting next yield is enough
+        await new Promise(resolve => setTimeout(resolve, 10)); 
+    }
+
   } catch (error: any) {
     console.error('Gemini Streaming Error:', error.message);
     throw new Error(`Gagal streaming response: ${error.message}`);

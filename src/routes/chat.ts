@@ -93,7 +93,9 @@ router.post('/stream', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    // Initial ping to flush headers immediately (Fix for Vercel buffering)
+    res.write(': ping\n\n');
 
     // Filter and format history properly - skip empty messages
     const formattedHistory: ChatMessage[] = (history || [])

@@ -46,14 +46,15 @@ router.post('/', async (req: Request, res: Response) => {
     const userId = getUserId(req);
     console.log('📝 Creating conversation for userId:', userId);
 
-    // Check conversation limit for guests (max 3)
+    // Check conversation limit for guests (increased for demo)
     if (userId.startsWith('guest_')) {
       const existingConversations = await getConversationsByUser(userId);
-      if (existingConversations.length >= 3) {
+      // Increased limit from 3 to 100 to avoid locking out during demo/testing
+      if (existingConversations.length >= 100) {
         console.log('❌ Guest conversation limit reached:', existingConversations.length);
         return res.status(403).json({ 
           error: 'Limit tercapai',
-          message: 'Akun tamu dibatasi 3 percakapan. Silakan hapus percakapan lama atau daftar akun.'
+          message: 'Akun tamu dibatasi 100 percakapan. Silakan hapus percakapan lama.'
         });
       }
     }
