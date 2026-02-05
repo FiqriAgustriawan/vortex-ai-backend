@@ -44,7 +44,13 @@ BAHASA: Gunakan Bahasa Indonesia untuk penjelasan, kode dalam bahasa pemrograman
 
 export async function generateChatResponse(request: ChatRequest): Promise<ChatResponse> {
   // Use requested model or default to 2.5-flash
-  const modelName = request.model || 'gemini-2.5-flash';
+  let modelName = request.model || 'gemini-2.5-flash';
+
+  // FORCE MAP legacy/broken models to 2.5-flash
+  if (modelName === 'gemini-1.5-flash' || modelName.includes('1.5')) {
+    console.log(`⚠️ Legacy model ${modelName} requested. Redirecting to gemini-2.5-flash`);
+    modelName = 'gemini-2.5-flash';
+  }
   
   if (!API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -99,7 +105,13 @@ export async function generateChatResponse(request: ChatRequest): Promise<ChatRe
 // Streaming response generator
 export async function* generateStreamingResponse(request: ChatRequest): AsyncGenerator<string> {
   // Use requested model or default to 2.5-flash
-  const modelName = request.model || 'gemini-2.5-flash';
+  let modelName = request.model || 'gemini-2.5-flash';
+
+  // FORCE MAP legacy/broken models to 2.5-flash
+  if (modelName === 'gemini-1.5-flash' || modelName.includes('1.5')) {
+    console.log(`⚠️ Legacy model ${modelName} requested. Redirecting to gemini-2.5-flash`);
+    modelName = 'gemini-2.5-flash';
+  }
   
   if (!API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
