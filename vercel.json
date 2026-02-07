@@ -6,12 +6,6 @@
       "destination": "/src/index.ts"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/cron/digest",
-      "schedule": "0 * * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
@@ -24,3 +18,4 @@
     }
   ]
 }
+
