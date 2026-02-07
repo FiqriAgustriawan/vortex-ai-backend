@@ -12,14 +12,14 @@ export async function getUsersForDigest(currentHour: number): Promise<any[]> {
   // Find users where:
   // 1. Digest is enabled
   // 2. They have a push token
-  // 3. Their schedule time matches current hour (we compare just the hour part)
+  // 3. Their UTC hour matches the current scheduler hour
   const users = await DigestSettings.find({
     enabled: true,
     pushToken: { $exists: true, $ne: null },
-    scheduleTime: { $regex: `^${hourString}:` }, // Matches "08:00", "08:30", etc.
+    utcHour: currentHour,
   });
 
-  console.log(`📋 Found ${users.length} users for hour ${hourString}:00`);
+  console.log(`📋 Found ${users.length} users for UTC hour ${hourString}:00`);
   return users;
 }
 

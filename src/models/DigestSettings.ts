@@ -79,6 +79,17 @@ const DigestSettingsSchema = new Schema<IDigestSettings>(
     pushToken: {
       type: String,
     },
+    // Normalized UTC time for efficient querying
+    utcHour: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    utcMinute: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
   },
   {
     timestamps: true,

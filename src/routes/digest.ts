@@ -45,6 +45,23 @@ router.get('/settings/:userId', async (req: Request, res: Response) => {
   }
 });
 
+// Helper to get timezone offset in hours
+function getTimezoneOffset(timezone: string): number {
+  const offsets: Record<string, number> = {
+    'Asia/Jakarta': 7,
+    'Asia/Bangkok': 7,
+    'Asia/Makassar': 8,
+    'Asia/Singapore': 8,
+    'Asia/Jayapura': 9,
+    'Asia/Tokyo': 9,
+    'Australia/Sydney': 11,
+    'Europe/London': 0, // GMT/BST (simplified)
+    'America/New_York': -5, // EST (simplified)
+    'UTC': 0,
+  };
+  return offsets[timezone] || 7; // Default to WIB (UTC+7)
+}
+
 // Save/update digest settings
 router.post('/settings', async (req: Request, res: Response) => {
   try {
@@ -52,6 +69,25 @@ router.post('/settings', async (req: Request, res: Response) => {
     
     if (!userId) {
       return res.status(400).json({ success: false, error: 'userId is required' });
+    }
+
+    // Calculate UTC time
+    let utcHour = 0;
+    let utcMinute = 0;
+
+    if (scheduleTime) {
+      const [hour, minute] = scheduleTime.split(':').map(Number);
+      const offset = getTimezoneOffset(timezone || 'Asia/Jakarta');
+      
+      // Calculate UTC hour
+      // Example: 08:00 WIB (UTC+7) -> 08 - 7 = 01:00 UTC
+      // Example: 05:00 WIB (UTC+7) -> 05 - 7 = -2 -> 22:00 UTC (prev day)
+      let calculatedHeader = hour - offset;
+      if (calculatedHeader < 0) calculatedHeader += 24;
+      if (calculatedHeader >= 24) calculatedHeader -= 24;
+      
+      utcHour = calculatedHeader;
+      utcMinute = minute;
     }
     
     const settings = await DigestSettings.findOneAndUpdate(
@@ -65,11 +101,13 @@ router.post('/settings', async (req: Request, res: Response) => {
         customPrompt,
         language,
         pushToken,
+        utcHour,
+        utcMinute,
       },
       { upsert: true, new: true, runValidators: true }
     );
     
-    console.log(`📋 Digest settings updated for user: ${userId}`);
+    console.log(`📋 Digest settings updated for user: ${userId} (Schedule: ${scheduleTime} ${timezone} -> UTC: ${utcHour}:${utcMinute})`);
     res.json({ success: true, data: settings });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -169,8 +207,20 @@ router.post('/test', async (req: Request, res: Response) => {
         sources: result.sources,
         sentAt: new Date(),
       });
-      await historyEntry.save();
+      const savedDigest = await historyEntry.save();
       console.log(`💾 Test digest saved to history`);
+
+      // Try to send push notification if token exists
+      const settings = await DigestSettings.findOne({ userId });
+      if (settings?.pushToken) {
+        const { sendDigestNotification } = await import('../services/pushNotification');
+        await sendDigestNotification(
+          settings.pushToken,
+          savedDigest._id as string,
+          result.title,
+          result.content
+        );
+      }
     }
     
     res.json({
