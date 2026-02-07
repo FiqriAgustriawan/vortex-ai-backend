@@ -1,7 +1,7 @@
 
-import fetch from 'node-fetch';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai'; // Keep for types if needed, but we use fetch
+// Removed node-fetch import to use native fetch in Node 18+
+// import fetch from 'node-fetch'; 
 
 dotenv.config();
 
@@ -105,6 +105,7 @@ FORMAT OUTPUT:
   try {
     const url = `${API_BASE_URL}/${MODEL}:generateContent?key=${API_KEY}`;
     
+    // Use global fetch
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -115,7 +116,7 @@ FORMAT OUTPUT:
           parts: [{ text: promptText }]
         }],
         tools: [{
-          google_search: {} // Enable Google Grounding
+          google_search: {} // Enable Google Grounding (snake_case)
         }],
         generationConfig: {
           temperature: 0.7,
@@ -126,6 +127,7 @@ FORMAT OUTPUT:
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('Gemini API Error Detail:', JSON.stringify(errorData));
       throw new Error(`Gemini API Error: ${response.status} ${JSON.stringify(errorData)}`);
     }
 
@@ -162,6 +164,7 @@ FORMAT OUTPUT:
     };
   } catch (error: any) {
     console.error('Grounding API Error:', error.message);
+    // Include the original error message in the thrown error so it propagates to API response
     throw new Error(`Gagal generate digest: ${error.message}`);
   }
 }
