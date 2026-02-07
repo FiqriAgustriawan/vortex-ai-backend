@@ -1,18 +1,19 @@
-import { GoogleGenAI } from '@google/genai';
+
 import dotenv from 'dotenv';
+// Removed node-fetch import to use native fetch in Node 18+
+// import fetch from 'node-fetch'; 
 
 // Load environment variables first
 dotenv.config();
 
 const API_KEY = process.env.GEMINI_API_KEY || '';
+const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 if (!API_KEY) {
   console.warn('⚠️ GEMINI_API_KEY not set. AI features will not work.');
 } else {
   console.log('✅ Gemini API Key loaded successfully');
 }
-
-const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -67,7 +68,7 @@ export async function generateChatResponse(request: ChatRequest): Promise<ChatRe
 
     console.log(`📤 Sending RAW API request to ${modelName}...`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+    const url = `${API_BASE_URL}/${modelName}:generateContent?key=${API_KEY}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -90,7 +91,7 @@ export async function generateChatResponse(request: ChatRequest): Promise<ChatRe
         throw new Error(`API Error ${response.status}: ${errText}`);
     }
 
-    const data = await response.json() as any;
+    const data: any = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, tidak ada respons.';
     
     console.log(`✅ RAW Response received from ${modelName}`);
@@ -137,7 +138,7 @@ export async function* generateStreamingResponse(request: ChatRequest): AsyncGen
     console.log(`📤 Streaming (Simulated) RAW API request to ${modelName}...`);
 
     // Use standard generateContent (not stream) for reliability
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+    const url = `${API_BASE_URL}/${modelName}:generateContent?key=${API_KEY}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -160,7 +161,7 @@ export async function* generateStreamingResponse(request: ChatRequest): AsyncGen
         throw new Error(`API Error ${response.status}: ${errText}`);
     }
 
-    const data = await response.json() as any;
+    const data: any = await response.json();
     const fullText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     console.log(`✅ Response received (Length: ${fullText.length})`);
@@ -188,6 +189,8 @@ export async function generateVisionResponse(request: {
   systemPrompt?: string;
 }): Promise<ChatResponse> {
   const modelName = 'gemini-2.0-flash'; // Vision-capable model
+  // Note: 2.5-flash might also support vision, but staying safe with 2.0-flash for now or user request.
+  // Actually, let's use 2.0-flash-exp if available or just try standard model.
   
   if (!API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -202,28 +205,40 @@ export async function generateVisionResponse(request: {
       cleanBase64 = cleanBase64.split(',')[1];
     }
 
-    const response = await genAI.models.generateContent({
-      model: modelName,
-      contents: [{
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType: request.mimeType,
-              data: cleanBase64,
-            }
-          },
-          { text: request.message }
-        ]
-      }],
-      config: {
-        systemInstruction: request.systemPrompt || DEFAULT_SYSTEM_PROMPT,
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-      }
+    const url = `${API_BASE_URL}/${modelName}:generateContent?key=${API_KEY}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: request.mimeType,
+                  data: cleanBase64,
+                }
+              },
+              { text: request.message }
+            ]
+        }],
+        systemInstruction: { parts: [{ text: request.systemPrompt || DEFAULT_SYSTEM_PROMPT }] },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+        }
+      })
     });
 
-    const text = response.text || 'Maaf, saya tidak bisa menganalisis gambar ini.';
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error('Gemini Vision Error Body:', errText);
+        throw new Error(`Vision API Error ${response.status}: ${errText}`);
+    }
+
+    const data: any = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, saya tidak bisa menganalisis gambar ini.';
     console.log(`✅ Vision response received from ${modelName}`);
 
     return { response: text, model: modelName };
