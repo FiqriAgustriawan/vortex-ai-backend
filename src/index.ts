@@ -6,6 +6,7 @@ import conversationsRoutes from './routes/conversations';
 import imageRoutes from './routes/image';
 import authRoutes from './routes/auth';
 import guestRoutes from './routes/guest';
+import digestRoutes from './routes/digest';
 import { connectToDatabase } from './database/connection';
 
 // Load environment variables
@@ -32,7 +33,8 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       chat: '/api/chat',
       conversations: '/api/conversations',
-      image: '/api/image'
+      image: '/api/image',
+      digest: '/api/digest'
     }
   });
 });
@@ -51,6 +53,13 @@ app.use('/api/guest', guestRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/image', imageRoutes);
+app.use('/api/digest', digestRoutes);
+
+// Vercel Cron alias - maps /api/cron/digest to /api/digest/cron
+app.get('/api/cron/digest', (req, res, next) => {
+  req.url = '/api/digest/cron';
+  digestRoutes(req, res, next);
+});
 
 // 404 handler
 app.use((req, res) => {

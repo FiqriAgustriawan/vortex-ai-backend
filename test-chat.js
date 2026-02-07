@@ -10,7 +10,7 @@ async function testChat() {
       },
       body: JSON.stringify({
         message: "Halo, tes local",
-        model: "gemini-2.5-flash", // Testing auto-correct logic (should become 1.5)
+        model: "gemini-2.5-flash", 
         history: []
       })
     });
