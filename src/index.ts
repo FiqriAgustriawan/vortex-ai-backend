@@ -16,12 +16,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+// Middleware (CORS & JSON)
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '10mb' }));
+
+// 🔌 Database Connection Middleware (CRITICAL for Serverless)
+// Ensures DB is connected before processing any request
+app.use(async (req, res, next) => {
+  if (req.path === '/api/health') return next(); // Skip for health check if needed, but safer to include
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    console.error('Database connection failed in middleware:', error);
+    next(error);
+  }
+});
 
 // Health check
 app.get('/', (req, res) => {
@@ -75,28 +89,21 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   });
 });
 
-// Start server
-const startServer = async () => {
-  try {
-    // Connect to MongoDB
-    const dbConnected = await connectToDatabase();
-    
-    if (!dbConnected) {
-      console.log('⚠️ Running without MongoDB (in-memory mode)');
-      console.log('   Data will not persist after restart');
+// Start server (Only for local development)
+if (process.env.NODE_ENV !== 'production') {
+  const startServer = async () => {
+    try {
+      await connectToDatabase();
+      app.listen(PORT, () => {
+        console.log(`🚀 Vortex AI Backend running on port ${PORT}`);
+        console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+      });
+    } catch (error) {
+      console.error('Failed to start server:', error);
+      process.exit(1);
     }
-
-    app.listen(PORT, () => {
-      console.log(`🚀 Vortex AI Backend running on port ${PORT}`);
-      console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📍 API docs: http://localhost:${PORT}/`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+  };
+  startServer();
+}
 
 export default app;
