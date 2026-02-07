@@ -1,5 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
+
+import fetch from 'node-fetch';
 import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai'; // Keep for types if needed, but we use fetch
 
 dotenv.config();
 
@@ -9,7 +11,9 @@ if (!API_KEY) {
   console.warn('⚠️ GEMINI_API_KEY not set. Grounding features will not work.');
 }
 
-const genAI = new GoogleGenAI({ apiKey: API_KEY });
+// Model Configuration
+const MODEL = 'gemini-2.5-flash';
+const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Topic prompts for different categories
 const TOPIC_PROMPTS: Record<string, string> = {
@@ -44,7 +48,7 @@ export interface DigestResult {
 }
 
 /**
- * Generate a news digest using Gemini with Google Grounding
+ * Generate a news digest using Gemini with Google Grounding via REST API
  * @param topics Array of topic IDs to include
  * @param language Language code for the digest
  * @param customPrompt Optional custom instructions
@@ -66,7 +70,7 @@ export async function generateDigest(
   const langInstruction = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS['id'];
 
   // Build the prompt
-  const prompt = `
+  const promptText = `
 Kamu adalah asisten berita profesional. Tugas kamu adalah membuat ringkasan berita harian (Daily Digest).
 
 TOPIK: ${topicDescriptions}
@@ -96,27 +100,44 @@ FORMAT OUTPUT:
 *Digest ini dibuat otomatis oleh Vortex AI*
 `;
 
-  console.log(`📰 Generating digest for topics: ${topics.join(', ')} in ${language}`);
+  console.log(`📰 Generating digest for topics: ${topics.join(', ')} in ${language} using ${MODEL}`);
 
   try {
-    const response = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }], // Enable Google Grounding!
-        temperature: 0.7,
-        maxOutputTokens: 4096,
+    const url = `${API_BASE_URL}/${MODEL}:generateContent?key=${API_KEY}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
       },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: promptText }]
+        }],
+        tools: [{
+          google_search: {} // Enable Google Grounding
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096
+        }
+      })
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Gemini API Error: ${response.status} ${JSON.stringify(errorData)}`);
+    }
+
+    const data: any = await response.json();
+    
     // Extract text content
-    const text = response.text || 'Tidak ada konten yang dihasilkan.';
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Tidak ada konten yang dihasilkan.';
     
-    // Extract grounding sources if available
+    // Extract grounding sources
     const sources: GroundingSource[] = [];
+    const groundingMetadata = data.candidates?.[0]?.groundingMetadata;
     
-    // Check for grounding metadata in the response
-    const groundingMetadata = (response as any).candidates?.[0]?.groundingMetadata;
     if (groundingMetadata?.groundingChunks) {
       for (const chunk of groundingMetadata.groundingChunks) {
         if (chunk.web?.uri && chunk.web?.title) {
@@ -154,17 +175,33 @@ export async function testGrounding(): Promise<string> {
   }
 
   try {
-    const response = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: 'Apa berita teknologi terpenting hari ini? Berikan 3 headline singkat.',
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.7,
-        maxOutputTokens: 1024,
+    const url = `${API_BASE_URL}/${MODEL}:generateContent?key=${API_KEY}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
       },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: 'Apa berita teknologi terpenting hari ini? Berikan 3 headline singkat.' }]
+        }],
+        tools: [{
+          google_search: {}
+        }],
+        generationConfig: {
+          maxOutputTokens: 1024
+        }
+      })
     });
 
-    return response.text || 'No response';
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Gemini API Error: ${response.status} ${JSON.stringify(errorData)}`);
+    }
+
+    const data: any = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
   } catch (error: any) {
     console.error('Grounding Test Error:', error.message);
     throw error;
