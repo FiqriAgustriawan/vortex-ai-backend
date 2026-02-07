@@ -232,6 +232,14 @@ export async function generateVisionResponse(request: {
     });
 
     if (!response.ok) {
+        if (response.status === 429) {
+          console.warn(`⚠️ Vision API Quota Exceeded (429) for ${modelName}`);
+          return { 
+            response: "⚠️ **Kuota Habis**\n\nMaaf, batas penggunaan AI untuk analisis gambar hari ini sudah tercapai. Fitur ini menggunakan model Vision yang berat. Silakan coba lagi besok hari atau gunakan chat teks biasa.",
+            model: modelName 
+          };
+        }
+
         const errText = await response.text();
         console.error('Gemini Vision Error Body:', errText);
         throw new Error(`Vision API Error ${response.status}: ${errText}`);
