@@ -5,12 +5,20 @@ dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 
-let isConnected = false;
+// No longer relying on manual flag for serverless
+// let isConnected = false; 
 
 export const connectToDatabase = async (): Promise<boolean> => {
-  if (isConnected) {
+  // Check strict connection state (1 = connected)
+  if (mongoose.connection.readyState === 1) {
     console.log('📦 Using existing MongoDB connection');
     return true;
+  }
+
+  // If connecting (2), wait for it
+  if (mongoose.connection.readyState === 2) {
+    console.log('⏳ Waiting for existing connection request...');
+    return true; // Mongoose buffers requests, so this is okay
   }
 
   if (!MONGODB_URI) {
@@ -23,32 +31,33 @@ export const connectToDatabase = async (): Promise<boolean> => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      bufferCommands: true, // Allow buffering during connection
     };
 
+    console.log('🔌 Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI, options);
-    isConnected = true;
     console.log('✅ Connected to MongoDB Atlas');
     return true;
   } catch (error: any) {
     console.error('❌ MongoDB connection error:', error.message);
-    isConnected = false;
     return false;
   }
 };
 
 export const disconnectFromDatabase = async (): Promise<void> => {
-  if (!isConnected) return;
+  if (mongoose.connection.readyState === 0) return;
   
   try {
     await mongoose.disconnect();
-    isConnected = false;
     console.log('📦 Disconnected from MongoDB');
   } catch (error: any) {
     console.error('Error disconnecting from MongoDB:', error.message);
   }
 };
 
-export const isDatabaseConnected = (): boolean => isConnected;
+export const isDatabaseConnected = (): boolean => {
+  return mongoose.connection.readyState === 1;
+};
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
