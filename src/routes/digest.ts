@@ -214,12 +214,12 @@ router.post('/test', async (req: Request, res: Response) => {
       const settings = await DigestSettings.findOne({ userId });
       if (settings?.pushToken) {
         const { sendDigestNotification } = await import('../services/pushNotification');
-        await sendDigestNotification(
-          settings.pushToken,
-          savedDigest._id as string,
-          result.title,
-          result.content
-        );
+          await sendDigestNotification(
+            settings.pushToken,
+            savedDigest._id.toString(),
+            result.title,
+            result.content
+          );
       }
     }
     
