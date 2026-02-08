@@ -10,6 +10,8 @@ export interface IDigestSettings extends Document {
   customPrompt?: string;          // Optional custom instruction
   language: string;               // "id", "en", "es", etc.
   pushToken?: string;             // Expo push token
+  utcHour?: number;
+  utcMinute?: number;
   createdAt: Date;
   updatedAt: Date;
 }
