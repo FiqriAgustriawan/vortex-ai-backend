@@ -14,6 +14,9 @@ import {
 
 const router = Router();
 
+// UUID regex pattern
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Middleware to extract user ID from token
 const getUserId = (req: Request): string => {
   const authHeader = req.headers.authorization;
@@ -28,6 +31,11 @@ const getUserId = (req: Request): string => {
   // Check if it's a guest token (starts with 'guest_')
   if (token.startsWith('guest_')) {
     return token; // Use the guest token as userId
+  }
+  
+  // Check if it's a direct UUID (e.g., Supabase user.id)
+  if (UUID_REGEX.test(token)) {
+    return token; // Use the UUID directly as userId
   }
   
   // Try to verify as JWT
